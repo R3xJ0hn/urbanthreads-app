@@ -104,7 +104,7 @@ function MobileNav({
         <div className="my-3 border-t border-black/5" />
 
         <a
-          href="#"
+          href="/login"
           onClick={onNavigate}
           className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-black/80 hover:bg-black/5 hover:text-black"
         >
