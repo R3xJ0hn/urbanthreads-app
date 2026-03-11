@@ -3,20 +3,39 @@
 import * as React from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useActionState } from "react";
-import { login } from "@/app/login/action";
 import { useFormStatus } from "react-dom";
+import { getSupabaseClient } from "@/lib/supabase/client";
+import { authenticate } from "./action";
 
 type AuthTab = "login" | "signup";
+
+type AuthState = {
+  errors?: string;
+};
 
 export default function LoginForm() {
   const [tab, setTab] = React.useState<AuthTab>("login");
   const [showPassword, setShowPassword] = React.useState(false);
-  const [state, loginAction] = useActionState(login, undefined);
+  const [state, authAction] = useActionState<AuthState | undefined, FormData>(
+    authenticate,
+    undefined
+  );
+
+  async function signInWithGoogle() {
+    const supabase = getSupabaseClient();
+
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+  }
+
 
   return (
     <div className="min-h-screen w-full bg-white flex items-center justify-center p-2">
       <div className="w-full max-w-130">
-        {/* Tabs */}
         <div className="flex items-end justify-center gap-16 mb-6">
           <TabButton active={tab === "login"} onClick={() => setTab("login")}>
             Login
@@ -26,23 +45,53 @@ export default function LoginForm() {
           </TabButton>
         </div>
 
-        {/* Card */}
         <div className="rounded-2xl border border-neutral-200 bg-white shadow-sm px-10 py-10">
-          {/* Social */}
           <div className="flex items-center justify-center gap-8 mb-8">
-            <IconCircleButton ariaLabel="Continue with Facebook">
+            <IconCircleButton
+              ariaLabel="Continue with Facebook"
+              onClick={() => {
+                // add Supabase Facebook OAuth later
+              }}
+            >
               <FacebookLogo />
             </IconCircleButton>
 
-            <IconCircleButton ariaLabel="Continue with Google">
+            <IconCircleButton
+              ariaLabel="Continue with Google"
+              onClick={signInWithGoogle}
+            >
               <GoogleLogo />
             </IconCircleButton>
           </div>
 
           <div className="text-sm text-neutral-500 mb-4">Or continue with:</div>
 
-          <form className="space-y-5" action={loginAction}>
+          <form className="space-y-5" action={authAction}>
+            <input type="hidden" name="mode" value={tab} />
+
+            {tab === "signup" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <input
+                  name="first_name"
+                  type="text"
+                  autoComplete="given-name"
+                  placeholder="First Name *"
+                  required
+                  className="w-full rounded-md border border-neutral-200 px-4 py-3 text-[15px] outline-none focus:border-neutral-400"
+                />
+                <input
+                  name="last_name"
+                  type="text"
+                  autoComplete="family-name"
+                  placeholder="Last Name *"
+                  required
+                  className="w-full rounded-md border border-neutral-200 px-4 py-3 text-[15px] outline-none focus:border-neutral-400"
+                />
+              </div>
+            )}
+
             <input
+              name="email"
               type="email"
               placeholder="Email Address *"
               className="w-full rounded-md border border-neutral-200 px-4 py-3 text-[15px] outline-none focus:border-neutral-400"
@@ -50,6 +99,7 @@ export default function LoginForm() {
 
             <div className="relative">
               <input
+                name="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Password *"
                 className="w-full rounded-md border border-neutral-200 px-4 py-3 pr-12 text-[15px] outline-none focus:border-neutral-400"
@@ -68,12 +118,14 @@ export default function LoginForm() {
               </button>
             </div>
 
-            {state?.errors && typeof state.errors === "string" && (
-              <p className="text-red-500">{state.errors}</p>
+            {state?.errors && (
+              <p className="text-sm text-red-500">
+                Failed to {tab === "login" ? "login" : "sign up"}. {state.errors}
+              </p>
             )}
 
             <div className="flex items-center justify-end">
-              <a href="#" className="text-sm text-sky-700 hover:underline">
+              <a href="/forgot-password" className="text-sm text-sky-700 hover:underline">
                 Forgot Password?
               </a>
             </div>
@@ -81,6 +133,7 @@ export default function LoginForm() {
             <label className="flex items-center gap-3 text-[15px] text-neutral-700 select-none">
               <input
                 type="checkbox"
+                name="remember"
                 defaultChecked
                 className="h-5 w-5 rounded border-neutral-300 text-neutral-900 focus:ring-0"
               />
@@ -114,9 +167,9 @@ function SubmitButton({ tab }: { tab: AuthTab }) {
     <button
       disabled={pending}
       type="submit"
-      className="w-full rounded-md bg-neutral-100 px-4 py-3 text-[15px] font-medium text-neutral-500"
+      className="w-full rounded-md bg-neutral-900 px-4 py-3 text-[15px] font-medium text-white disabled:opacity-60"
     >
-      {tab === "login" ? "Login" : "Sign up"}
+      {pending ? "Please wait..." : tab === "login" ? "Login" : "Sign up"}
     </button>
   );
 }
@@ -150,14 +203,17 @@ function TabButton({
 function IconCircleButton({
   children,
   ariaLabel,
+  onClick,
 }: {
   children: React.ReactNode;
   ariaLabel: string;
+  onClick?: () => void;
 }) {
   return (
     <button
       type="button"
       aria-label={ariaLabel}
+      onClick={onClick}
       className="grid place-items-center rounded-full p-2 hover:bg-neutral-100"
     >
       {children}
